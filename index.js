@@ -35,7 +35,23 @@ wss.on('connection', ws => {
     delete gameState.players[id];
     broadcast();
   });
+
+  const data = JSON.parse(msg);
+  if(data.type === "create") {
+    const c = code();             // génère le code de partie
+    rooms[c] = { players: {}, sockets: [] };
+    const id = crypto.randomUUID();
+    rooms[c].players[id] = { x:5, y:5 };
+    rooms[c].sockets.push(ws);
+
+    ws.send(JSON.stringify({
+      type: "created",
+      code: c,       // <--- le code ici
+      id: id
+    }));
+  }
 });
+
 
 function broadcast() {
   const payload = JSON.stringify({
