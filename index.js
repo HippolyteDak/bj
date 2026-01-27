@@ -144,20 +144,27 @@ wss.on("connection", ws=>{
     }
 
     if(data.type==="move" && roomId){
-      const p = rooms[roomId].players[id];
+      const p = rooms[roomId].players[data.id];
       if(!p) return;
-      p.x = Math.max(0, Math.min(WIDTH-1, p.x+data.dx));
-      p.y = Math.max(0, Math.min(HEIGHT-1, p.y+data.dy));
-      // ramasser produit
-      const idx = rooms[roomId].products.findIndex(prod=>prod.x===p.x && prod.y===p.y);
-      if(idx!==-1){
+
+      p.x = Math.max(0, Math.min(WIDTH-1, p.x + data.dx));
+      p.y = Math.max(0, Math.min(HEIGHT-1, p.y + data.dy));
+
+      const idx = rooms[roomId].products.findIndex(
+        prod => prod.x === p.x && prod.y === p.y
+      );
+
+      if(idx !== -1){
         rooms[roomId].products.splice(idx,1);
-        p.collectedVisit = (p.collectedVisit||0)+1;
-        rooms[roomId].products = generateProducts(rooms[roomId].products, {x:p.x,y:p.y});
+        p.collectedVisit++;
+        rooms[roomId].products = generateProducts(
+          rooms[roomId].products,
+          {x:p.x, y:p.y}
+        );
       }
+
       broadcast(roomId);
     }
-
   });
 
   ws.on("close", ()=>{
