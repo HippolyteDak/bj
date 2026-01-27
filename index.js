@@ -14,13 +14,12 @@ function generateHoles(){
 }
 
 function generateProducts(existing=[], lastProduct=null){
-  const products = [...existing];
+  const products=[...existing];
   while(products.length<BASE_PRODUCTS){
     let x,y;
-    do{ x=Math.floor(Math.random()*WIDTH); y=Math.floor(Math.random()*HEIGHT); }
-    while(products.some(p=>p.x===x&&p.y===y) || (lastProduct && lastProduct.x===x && lastProduct.y===y));
-    products.push({x,y});
-    lastProduct={x,y};
+    do{x=Math.floor(Math.random()*WIDTH); y=Math.floor(Math.random()*HEIGHT);}
+    while(products.some(p=>p.x===x && p.y===y) || (lastProduct && lastProduct.x===x && lastProduct.y===y));
+    products.push({x,y}); lastProduct={x,y};
   }
   return products;
 }
@@ -47,7 +46,6 @@ function startRadiologistLoop(roomId){
     if(!rooms[roomId]) return;
     const entry = room.holes[Math.floor(Math.random()*room.holes.length)];
     const exit  = room.holes[Math.floor(Math.random()*room.holes.length)];
-
     room.radiologist = {
       x:entry.x, y:entry.y,
       dx:Math.sign(exit.x-entry.x)||1,
@@ -59,20 +57,32 @@ function startRadiologistLoop(roomId){
 
     const interval = setInterval(()=>{
       if(!room.radiologist) return;
-      if(Math.random()<0.3){ room.radiologist.dx*=-1; room.radiologist.dy*=-1; }
-      room.radiologist.x = Math.max(0, Math.min(WIDTH-1, room.radiologist.x+room.radiologist.dx));
-      room.radiologist.y = Math.max(0, Math.min(HEIGHT-1, room.radiologist.y+room.radiologist.dy));
-      broadcast(roomId);
-      if(room.holes.some(h=>h.x===room.radiologist.x && h.y===room.radiologist.y) && Date.now()-room.radiologist.start>=3000){
-        clearInterval(interval); room.radiologist=null; room.required=0; broadcast(roomId); startRadiologistLoop(roomId);
-      }
-    },700);
 
+      // Déplacement du radiologue
+      if(Math.random()<0.3){ room.radiologist.dx*=-1; room.radiologist.dy*=-1; }
+      room.radiologist.x=Math.max(0, Math.min(WIDTH-1, room.radiologist.x+room.radiologist.dx));
+      room.radiologist.y=Math.max(0, Math.min(HEIGHT-1, room.radiologist.y+room.radiologist.dy));
+
+      broadcast(roomId);
+
+      // Sortie sur un trou après 3s minimum
+      if(room.holes.some(h=>h.x===room.radiologist.x && h.y===room.radiologist.y)
+         && Date.now()-room.radiologist.start>=3000){
+        clearInterval(interval); room.radiologist=null; room.required=0; broadcast(roomId);
+        startRadiologistLoop(roomId);
+      }
+    }, 700);
+
+    // Fin de présence automatique
     setTimeout(()=>{
-      clearInterval(interval); room.radiologist=null; room.required=0; broadcast(roomId);
+      clearInterval(interval);
+      room.radiologist=null;
+      room.required=0;
+      broadcast(roomId);
       startRadiologistLoop(roomId);
     }, room.radiologist.duration);
-  }, 3000+Math.random()*4000);
+
+  }, 3000 + Math.random()*4000);
 }
 
 function resetRoom(roomId){
@@ -81,8 +91,8 @@ function resetRoom(roomId){
   for(const [pid,player] of Object.entries(room.players)){
     player.x=5; player.y=5; player.lives=3; player.collectedVisit=0;
   }
-  room.products = generateProducts([], null);
-  room.holes = generateHoles();
+  room.products=generateProducts([], null);
+  room.holes=generateHoles();
   room.radiologist=null;
   room.required=0;
   startRadiologistLoop(roomId);
@@ -92,7 +102,6 @@ function resetRoom(roomId){
 function endGame(roomId, loserId){
   const room = rooms[roomId];
   if(!room) return;
-
   const playerIds = Object.keys(room.players);
   const winnerId = playerIds.find(id=>id!==loserId) || loserId;
 
@@ -112,28 +121,24 @@ wss.on("connection", ws=>{
     let data;
     try{ data=JSON.parse(msg); } catch(e){ return; }
 
-    if(data.type==="create"){ // solo ou multi
-      roomId = code();
-      id = crypto.randomUUID();
-      rooms[roomId] = {
-        players:{ [id]: {x:5,y:5,lives:3,collectedVisit:0} },
+    if(data.type==="create"){
+      roomId=code(); id=crypto.randomUUID();
+      rooms[roomId]={
+        players:{ [id]:{x:5,y:5,lives:3,collectedVisit:0} },
         sockets:[ws],
         products: generateProducts([], null),
         holes: generateHoles(),
         radiologist:null,
         required:0
       };
-      ws.send(JSON.stringify({ type:"created", code:roomId, id }));
+      ws.send(JSON.stringify({type:"created", code:roomId, id}));
       startRadiologistLoop(roomId);
       return;
     }
 
     if(data.type==="join"){
       const c = data.code;
-      if(!rooms[c] || rooms[c].sockets.length>=2){
-        ws.send(JSON.stringify({type:"error", message:"Partie invalide ou pleine"}));
-        return;
-      }
+      if(!rooms[c] || rooms[c].sockets.length>=2){ ws.send(JSON.stringify({type:"error", message:"Partie invalide ou pleine"})); return; }
       roomId=c; id=crypto.randomUUID();
       rooms[c].players[id]={x:5,y:5,lives:3,collectedVisit:0};
       rooms[c].sockets.push(ws);
@@ -145,9 +150,10 @@ wss.on("connection", ws=>{
     if(data.type==="move" && roomId){
       const p = rooms[roomId].players[data.id];
       if(!p) return;
-      p.x = Math.max(0, Math.min(WIDTH-1, p.x+data.dx));
-      p.y = Math.max(0, Math.min(HEIGHT-1, p.y+data.dy));
+      p.x=Math.max(0, Math.min(WIDTH-1,p.x+data.dx));
+      p.y=Math.max(0, Math.min(HEIGHT-1,p.y+data.dy));
 
+      // Ramassage produit
       const idx = rooms[roomId].products.findIndex(prod=>prod.x===p.x && prod.y===p.y);
       if(idx!==-1){
         rooms[roomId].products.splice(idx,1);
@@ -155,8 +161,8 @@ wss.on("connection", ws=>{
         rooms[roomId].products = generateProducts(rooms[roomId].products,{x:p.x,y:p.y});
       }
 
-      // vérifie si joueur perd sa vie par radiologue
-      if(rooms[roomId].radiologist && p.collectedVisit < rooms[roomId].required){
+      // Vérifie si radiologue est présent et produit requis non collecté
+      if(rooms[roomId].radiologist && p.collectedVisit<rooms[roomId].required){
         p.lives--;
         if(p.lives<=0) endGame(roomId, data.id);
       }
