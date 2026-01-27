@@ -75,19 +75,15 @@ function startRadiologistLoop(roomId){
 
 function endRadiologist(roomId, interval){
   clearInterval(interval);
-   const room = rooms[roomId];
-  if(!room) return;
+  const room = rooms[roomId];
+  if(!room || !room.radiologist) return;
 
-  // Sécurité : stop si déjà fini
-  if(!room.radiologist) return;
+  const required = room.radiologist.required;
 
-  // Pour chaque joueur, vérifier s'il a respecté le quota
   for(const [playerId, player] of Object.entries(room.players)){
-
-    if(player.collectedVisit < room.required){
+    if(player.collectedVisit < required){
       player.lives--;
 
-      // GAME OVER si plus de vies
       if(player.lives <= 0){
         room.radiologist = null;
         broadcast(roomId);
@@ -95,21 +91,15 @@ function endRadiologist(roomId, interval){
         return;
       }
     }
-
-    // Reset compteur pour la prochaine visite
     player.collectedVisit = 0;
   }
 
-  // Fin normale du radiologue
   room.radiologist = null;
-  room.required = 0;
-
-  // Envoi de l'état à tous les joueurs
   broadcast(roomId);
 
-  // Relance un nouveau radiologue après un délai aléatoire
   startRadiologistLoop(roomId);
 }
+
 
 // Diffuser état complet
 function broadcast(roomId, msg){
@@ -122,10 +112,10 @@ function broadcast(roomId, msg){
     products: room.products,
     holes: room.holes,
     radiologist: room.radiologist,
-    required: room.required
+    required: room.radiologist ? room.radiologist.required : 0
   };
 
-  room.clients.forEach(ws=>{
+  room.sockets.forEach(ws=>{
     if(ws.readyState===1){
       ws.send(JSON.stringify(data));
     }
