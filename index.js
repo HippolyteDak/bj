@@ -75,33 +75,80 @@ function startRadiologistLoop(roomId){
 
 function endRadiologist(roomId, interval){
   clearInterval(interval);
-  const room = rooms[roomId];
-  if(!room || !room.radiologist) return;
+   const room = rooms[roomId];
+  if(!room) return;
 
-  Object.values(room.players).forEach(p=>{
-    if((p.collectedVisit||0) < room.radiologist.required){
-      p.lives = (p.lives||3) -1;
+  // Sécurité : stop si déjà fini
+  if(!room.radiologist) return;
+
+  // Pour chaque joueur, vérifier s'il a respecté le quota
+  for(const [playerId, player] of Object.entries(room.players)){
+
+    if(player.collectedVisit < room.required){
+      player.lives--;
+
+      // GAME OVER si plus de vies
+      if(player.lives <= 0){
+        room.radiologist = null;
+        broadcast(roomId);
+        endGame(roomId, playerId);
+        return;
+      }
     }
-    p.collectedVisit = 0; // reset collecte pour prochain radiologue
-  });
+
+    // Reset compteur pour la prochaine visite
+    player.collectedVisit = 0;
+  }
+
+  // Fin normale du radiologue
   room.radiologist = null;
+  room.required = 0;
+
+  // Envoi de l'état à tous les joueurs
   broadcast(roomId);
+
+  // Relance un nouveau radiologue après un délai aléatoire
   startRadiologistLoop(roomId);
 }
 
 // Diffuser état complet
-function broadcast(roomId){
+function broadcast(roomId, msg){
   const room = rooms[roomId];
   if(!room) return;
-  const payload = JSON.stringify({
+
+  const data = msg || {
     type:"state",
-    players:room.players,
-    products:room.products,
-    holes:room.holes,
-    radiologist:room.radiologist
+    players: room.players,
+    products: room.products,
+    holes: room.holes,
+    radiologist: room.radiologist,
+    required: room.required
+  };
+
+  room.clients.forEach(ws=>{
+    if(ws.readyState===1){
+      ws.send(JSON.stringify(data));
+    }
   });
-  room.sockets.forEach(s=>s.send(payload));
 }
+
+
+function endGame(roomId, loserId){
+  const room = rooms[roomId];
+  if(!room) return;
+
+  const playersIds = Object.keys(room.players);
+  const winnerId = playersIds.find(id => id !== loserId) || loserId;
+
+  broadcast(roomId, {
+    type: "gameover",
+    winnerId,
+    loserId
+  });
+
+  delete rooms[roomId]; // ferme la partie
+}
+
 
 // ================== Connexions ==================
 wss.on("connection", ws=>{
