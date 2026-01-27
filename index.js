@@ -202,6 +202,32 @@ wss.on("connection", ws=>{
 
       broadcast(roomId);
     }
+
+    if(data.type === "reset" && roomId){
+      const room = rooms[roomId];
+      if(!room) return;
+
+      // Réinitialiser tous les joueurs
+      for(const [pid, player] of Object.entries(room.players)){
+        player.x = 5;
+        player.y = 5;
+        player.lives = 3;
+        player.collectedVisit = 0;
+      }
+
+      // Réinitialiser produits, trous, radiologue
+      room.products = generateProducts([], null);
+      room.holes = generateHoles();
+      room.radiologist = null;
+      room.required = 0;
+
+      // Redémarrer la boucle radiologue
+      startRadiologistLoop(roomId);
+
+      // Envoyer état initial à tous
+      broadcast(roomId);
+    }
+
   });
 
   ws.on("close", ()=>{
