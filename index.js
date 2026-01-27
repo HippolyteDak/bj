@@ -203,11 +203,11 @@ wss.on("connection", ws=>{
       broadcast(roomId);
     }
 
-    if(data.type === "reset" && roomId){
+   if(data.type === "reset" && roomId){
       const room = rooms[roomId];
       if(!room) return;
 
-      // Réinitialiser tous les joueurs
+      // Reset joueurs
       for(const [pid, player] of Object.entries(room.players)){
         player.x = 5;
         player.y = 5;
@@ -215,7 +215,7 @@ wss.on("connection", ws=>{
         player.collectedVisit = 0;
       }
 
-      // Réinitialiser produits, trous, radiologue
+      // Reset grille
       room.products = generateProducts([], null);
       room.holes = generateHoles();
       room.radiologist = null;
@@ -224,9 +224,10 @@ wss.on("connection", ws=>{
       // Redémarrer la boucle radiologue
       startRadiologistLoop(roomId);
 
-      // Envoyer état initial à tous
+      // Envoyer l’état initial à tous
       broadcast(roomId);
     }
+
 
   });
 
