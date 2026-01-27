@@ -9,10 +9,12 @@ const BASE_PRODUCTS = 6;
 
 const rooms = {};
 
+// Générer code 4 lettres
 function genCode() {
-  return Math.random().toString(36).substring(2,6).toUpperCase();
+  return Math.random().toString(36).substring(2, 6).toUpperCase();
 }
 
+// Générer trous aléatoires
 function generateHoles() {
   const holes = [];
   for (let i = 0; i < WIDTH; i++) {
@@ -26,122 +28,134 @@ function generateHoles() {
   return holes;
 }
 
-function generateProducts(existing=[]) {
+// Générer n produits aléatoires
+function generateProducts(count = BASE_PRODUCTS, existing = []) {
   const products = [...existing];
-  while(products.length < BASE_PRODUCTS) {
+  while (products.length < count) {
     const x = Math.floor(Math.random() * WIDTH);
     const y = Math.floor(Math.random() * HEIGHT);
-    if(!products.some(p=>p.x===x&&p.y===y)) products.push({x,y});
+    if (!products.some(p => p.x === x && p.y === y)) products.push({ x, y });
   }
   return products;
 }
 
-function broadcast(roomId) {
+// Diffuser l'état aux clients
+function broadcast(roomId, msg) {
   const room = rooms[roomId];
-  if(!room) return;
+  if (!room) return;
 
-  const data = JSON.stringify({
+  const data = msg || {
     type: "state",
     players: room.players,
     products: room.products,
     holes: room.holes,
     radiologist: room.radiologist,
     required: room.required
-  });
+  };
 
   room.clients.forEach(ws => {
-    if(ws.readyState===1) ws.send(data);
+    if (ws.readyState === 1) ws.send(JSON.stringify(data));
   });
 }
 
-// Radiologue
+// Boucle radiologue
 function startRadiologist(roomId) {
   const room = rooms[roomId];
-  if(!room || room.holes.length<2) return;
+  if (!room || room.holes.length < 2) return;
 
-  const entry = room.holes[Math.floor(Math.random()*room.holes.length)];
-  const exit  = room.holes[Math.floor(Math.random()*room.holes.length)];
+  // Choisir entrée/sortie
+  const entry = room.holes[Math.floor(Math.random() * room.holes.length)];
+  const exit  = room.holes[Math.floor(Math.random() * room.holes.length)];
 
-  room.required = Math.max(1, Math.floor(Math.random()*3)+1);
+  room.required = Math.max(1, Math.floor(2 + Math.random() * 3));
   room.radiologist = {
     x: entry.x,
     y: entry.y,
     dx: Math.sign(exit.x - entry.x) || 1,
-    dy: Math.sign(exit.y - entry.y) || 0,
-    start: Date.now()
+    dy: Math.sign(exit.y - entry.y) || 0
   };
 
   // Reset collectedVisit pour tous les joueurs
   Object.values(room.players).forEach(p => p.collectedVisit = 0);
 
-  room.timer = setInterval(() => {
+  const interval = setInterval(() => {
+    if (!room.radiologist) return;
+
     const r = room.radiologist;
-    if(!r) return;
+    // Mouvement aléatoire pour petits virages
+    if (Math.random() < 0.2) {
+      r.dx *= -1;
+      r.dy *= -1;
+    }
 
-    r.x += r.dx;
-    r.y += r.dy;
+    r.x = Math.max(0, Math.min(WIDTH - 1, r.x + r.dx));
+    r.y = Math.max(0, Math.min(HEIGHT - 1, r.y + r.dy));
 
-    // Sortie si sur un trou
-    if(room.holes.some(h=>h.x===r.x && h.y===r.y) && Date.now()-r.start>=2000){
-      clearInterval(room.timer);
+    // Si sur un trou et min 3 sec écoulées => radiologue sort
+    if (room.holes.some(h => h.x === r.x && h.y === r.y)) {
+      clearInterval(interval);
       room.radiologist = null;
 
-      // Vérification produits pris
-      Object.values(room.players).forEach(p=>{
-        if(p.collectedVisit < room.required) p.lives--;
+      // Vérifier quotas pour tous les joueurs
+      Object.entries(room.players).forEach(([pid, p]) => {
+        if (p.collectedVisit < room.required) p.lives--;
+        p.collectedVisit = 0;
       });
 
-      broadcast(roomId);
+      // Vérifier fin de partie
+      const pIds = Object.keys(room.players);
+      const p0 = room.players[pIds[0]];
+      const p1 = room.players[pIds[1]];
 
-      // Vérifier GameOver
-      const playersArray = Object.values(room.players);
-      if(playersArray.every(p=>p.lives<=0)){
-        // Comparer collected pour déterminer gagnant
-        const ids = Object.keys(room.players);
-        const p1 = room.players[ids[0]];
-        const p2 = room.players[ids[1]];
-
-        let winnerId=null, loserId=null, tie=false;
-        if(!p1 || !p2){ winnerId=ids[0]; loserId=null; }
-        else if(p1.collected === p2.collected){ tie=true; winnerId=ids[0]; loserId=ids[1]; }
-        else if(p1.collected < p2.collected){ winnerId=ids[0]; loserId=ids[1]; }
-        else { winnerId=ids[1]; loserId=ids[0]; }
-
-        broadcast(roomId,{
-          type:"gameover",
-          winnerId,
-          loserId,
-          tie,
-          products: { [ids[0]]: p1.collected, [ids[1]]: p2.collected }
-        });
-
-        delete rooms[roomId];
-        return;
+      if (pIds.length === 2) {
+        let gameOver = false, msg = {};
+        if (p0.lives <= 0 && p1.lives <= 0) {
+          // Égalité ou comparer produits
+          gameOver = true;
+          if (p0.collected < p1.collected) {
+            msg = { type: "gameover", winnerId: p0.id, loserId: p1.id, tie:false, products:{[p0.id]:p0.collected,[p1.id]:p1.collected}};
+          } else if (p1.collected < p0.collected) {
+            msg = { type: "gameover", winnerId: p1.id, loserId: p0.id, tie:false, products:{[p0.id]:p0.collected,[p1.id]:p1.collected}};
+          } else {
+            msg = { type:"gameover", tie:true, winnerId:p0.id, loserId:p1.id, products:{[p0.id]:p0.collected,[p1.id]:p1.collected} };
+          }
+        } else if (p0.lives <=0 || p1.lives<=0){
+          gameOver = true;
+          const winner = p0.lives>0? p0.id : p1.id;
+          const loser  = p0.lives<=0? p0.id : p1.id;
+          msg = {type:"gameover", winnerId:winner, loserId:loser, tie:false, products:{[p0.id]:p0.collected,[p1.id]:p1.collected}};
+        }
+        if(gameOver){
+          broadcast(roomId,msg);
+          delete rooms[roomId];
+          return;
+        }
       }
 
-      // Nouveau radiologue après délai
-      setTimeout(()=>startRadiologist(roomId), 3000);
+      broadcast(roomId);
+      setTimeout(()=> startRadiologist(roomId), 3000 + Math.random()*2000);
       return;
     }
 
     broadcast(roomId);
-  }, 800); // vitesse modérée
+  }, 700);
 }
 
-// Connexions
+// =================== Connexions ===================
 wss.on("connection", ws => {
-  let roomId=null, playerId=null;
+  let roomId=null;
+  let playerId=null;
 
   ws.on("message", msg => {
-    const data = JSON.parse(msg);
+    let data;
+    try { data = JSON.parse(msg); } catch(e){ return; }
 
-    // Création
     if(data.type==="create"){
       roomId = genCode();
       playerId = crypto.randomUUID();
 
       rooms[roomId] = {
-        players: { [playerId]: { x:5, y:5, lives:3, collected:0, collectedVisit:0 } },
+        players: { [playerId]: { id: playerId, x:5, y:5, lives:3, collected:0, collectedVisit:0 } },
         products: generateProducts(),
         holes: generateHoles(),
         radiologist: null,
@@ -149,11 +163,9 @@ wss.on("connection", ws => {
         clients: [ws]
       };
 
-      ws.send(JSON.stringify({ type:"created", roomId, playerId }));
-      return;
+      ws.send(JSON.stringify({type:"created", roomId, playerId}));
     }
 
-    // Rejoindre
     if(data.type==="join"){
       const room = rooms[data.roomId];
       if(!room || room.clients.length>=2){
@@ -163,16 +175,15 @@ wss.on("connection", ws => {
 
       roomId = data.roomId;
       playerId = crypto.randomUUID();
-      room.players[playerId] = { x:4, y:5, lives:3, collected:0, collectedVisit:0 };
+      room.players[playerId] = { id:playerId, x:4, y:5, lives:3, collected:0, collectedVisit:0 };
       room.clients.push(ws);
 
       ws.send(JSON.stringify({type:"joined", roomId, playerId}));
+
       broadcast(roomId);
       startRadiologist(roomId);
-      return;
     }
 
-    // Déplacement
     if(data.type==="move"){
       const room = rooms[roomId];
       if(!room) return;
@@ -183,13 +194,18 @@ wss.on("connection", ws => {
       p.x = Math.max(0, Math.min(WIDTH-1, p.x + data.dx));
       p.y = Math.max(0, Math.min(HEIGHT-1, p.y + data.dy));
 
-      const idx = room.products.findIndex(pr=>pr.x===p.x && pr.y===p.y);
+      // Vérifie si produit sur la case
+      const idx = room.products.findIndex(pr => pr.x === p.x && pr.y === p.y);
       if(idx!==-1){
         room.products.splice(idx,1);
-        p.collected++;        // total accumulé
-        p.collectedVisit++;   // pour le radiologue
-        // Respawn produit ailleurs
-        const newProd = generateProducts(room.products)[0];
+        p.collected++;
+        p.collectedVisit++;
+
+        // Respawn 1 produit
+        let newProd;
+        do {
+          newProd = { x: Math.floor(Math.random()*WIDTH), y: Math.floor(Math.random()*HEIGHT) };
+        } while(room.products.some(pr=>pr.x===newProd.x && pr.y===newProd.y));
         room.products.push(newProd);
       }
 
@@ -198,12 +214,12 @@ wss.on("connection", ws => {
   });
 
   ws.on("close", () => {
-    if(!rooms[roomId]) return;
+    if(!roomId || !rooms[roomId]) return;
     delete rooms[roomId].players[playerId];
-    rooms[roomId].clients = rooms[roomId].clients.filter(c=>c!==ws);
+    rooms[roomId].clients = rooms[roomId].clients.filter(c => c!==ws);
     if(rooms[roomId].clients.length===0) delete rooms[roomId];
     else broadcast(roomId);
   });
 });
 
-console.log("🟢 Serveur prêt !");
+console.log("🟢 Serveur WebSocket prêt !");
