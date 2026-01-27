@@ -73,6 +73,8 @@ function startRadiologist(roomId) {
     start: Date.now()
   };
 
+  Object.values(room.players).forEach(p => p.collected = 0);
+  
   broadcast(roomId);
 
   const interval = setInterval(() => {
@@ -98,6 +100,10 @@ function startRadiologist(roomId) {
         if (p.collected < room.required) p.lives--;
         p.collected = 0;
       });
+      
+      // Vérifie si la partie doit se terminer
+      checkGameOver(roomId);
+
 
       room.radiologist = null;
       room.required = 0;
@@ -112,6 +118,58 @@ function startRadiologist(roomId) {
 
   }, 700);
 }
+
+function checkGameOver(roomId) {
+  const room = rooms[roomId];
+  if (!room) return;
+
+  const players = Object.entries(room.players);
+  // si tous les joueurs ont au moins 1 vie, on continue
+  if (players.every(([id, p]) => p.lives > 0)) return;
+
+  // on a au moins un joueur à 0 vie
+  let winnerId = null;
+  let loserId = null;
+  let tie = false;
+
+  if (players.length === 1) {
+    winnerId = players[0][0]; // seul joueur => gagne
+  } else {
+    const [p1Id, p1] = players[0];
+    const [p2Id, p2] = players[1];
+
+    // les deux vies à 0
+    if (p1.lives <= 0 && p2.lives <= 0) {
+      // comparer nombre total de produits ramassés
+      if (p1.collected < p2.collected) winnerId = p1Id;
+      else if (p2.collected < p1.collected) winnerId = p2Id;
+      else tie = true;
+    } else if (p1.lives <= 0) winnerId = p2Id;
+    else if (p2.lives <= 0) winnerId = p1Id;
+
+    loserId = players.find(([id, p]) => id !== winnerId)?.[0] || null;
+  }
+
+  // envoyer gameover à tous
+  room.clients.forEach(ws => {
+    if (ws.readyState === 1) {
+      ws.send(JSON.stringify({
+        type: "gameover",
+        winnerId,
+        loserId,
+        tie,
+        products: players.reduce((acc, [id, p]) => {
+          acc[id] = p.collected;
+          return acc;
+        }, {})
+      }));
+    }
+  });
+
+  // fermer la partie
+  delete rooms[roomId];
+}
+
 
 wss.on("connection", ws => {
   let roomId = null;
