@@ -104,7 +104,10 @@ function endRadiologist(roomId, interval){
     products: room.products,
     holes: room.holes,
     radiologist: room.radiologist,
-    required: 0
+    required: 0,
+    ready:{},   // ready[playerId] = true
+    started:false,
+    time:0
   });
 
   // Fin de partie si un joueur est à 0 vie
@@ -199,6 +202,33 @@ wss.on("connection", ws=>{
 
       broadcast(roomId);
     }
+
+    if(data.type==='ready' && roomId){
+  const room = rooms[roomId];
+  room.ready[id]=true;
+
+  const allReady = Object.keys(room.players).every(pid=>room.ready[pid]);
+  if(allReady){
+    // reset complet
+    room.products = generateProducts([], null);
+    room.players = Object.fromEntries(Object.keys(room.players).map(pid=>[pid,{x:5,y:5,lives:3,collectedVisit:0}]));
+    room.radiologist=null;
+    room.required=0;
+    room.ready={};
+    room.started=true;
+    room.time=0;
+    
+    broadcast(roomId, {
+      type:'start',
+      players: room.players,
+      products: room.products,
+      holes: room.holes
+    });
+
+    startRadiologistLoop(roomId);
+  }
+}
+
   });
 
   ws.on("close", ()=>{
