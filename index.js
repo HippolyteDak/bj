@@ -26,8 +26,8 @@ function generateHoles() {
   return holes;
 }
 
-function generateProducts() {
-  const products = [];
+function generateProducts(existing = []) {
+  const products = [...existing];
   while (products.length < BASE_PRODUCTS) {
     const x = Math.floor(Math.random() * WIDTH);
     const y = Math.floor(Math.random() * HEIGHT);
@@ -58,7 +58,7 @@ function broadcast(roomId) {
 
 function startRadiologist(roomId) {
   const room = rooms[roomId];
-  if (!room) return;
+  if (!room || room.holes.length < 2) return;
 
   const entry = room.holes[Math.floor(Math.random() * room.holes.length)];
   const exit  = room.holes[Math.floor(Math.random() * room.holes.length)];
@@ -68,34 +68,48 @@ function startRadiologist(roomId) {
     x: entry.x,
     y: entry.y,
     dx: Math.sign(exit.x - entry.x) || 1,
-    dy: Math.sign(exit.y - entry.y) || 0
+    dy: Math.sign(exit.y - entry.y) || 0,
+    active: true,
+    start: Date.now()
   };
 
-  room.timer = setInterval(() => {
+  broadcast(roomId);
+
+  const interval = setInterval(() => {
     const r = room.radiologist;
-    if (!r) return;
+    if (!r || !r.active) return;
 
-    r.x += r.dx;
-    r.y += r.dy;
+    // mouvement aléatoire possible
+    if (Math.random() < 0.2) {
+      r.dx *= -1;
+      r.dy *= -1;
+    }
 
-    if (
-      room.holes.some(h => h.x === r.x && h.y === r.y)
-    ) {
-      clearInterval(room.timer);
-      room.radiologist = null;
+    r.x = Math.max(0, Math.min(WIDTH - 1, r.x + r.dx));
+    r.y = Math.max(0, Math.min(HEIGHT - 1, r.y + r.dy));
 
+    // sortie par un trou après 3s minimum
+    if (room.holes.some(h => h.x === r.x && h.y === r.y) && (Date.now() - r.start > 3000)) {
+      r.active = false;
+      clearInterval(interval);
+
+      // pénalité joueurs
       Object.values(room.players).forEach(p => {
         if (p.collected < room.required) p.lives--;
         p.collected = 0;
       });
 
+      room.radiologist = null;
+      room.required = 0;
       broadcast(roomId);
 
+      // relance radiologue après délai
       setTimeout(() => startRadiologist(roomId), 3000);
       return;
     }
 
     broadcast(roomId);
+
   }, 700);
 }
 
@@ -122,6 +136,9 @@ wss.on("connection", ws => {
       };
 
       ws.send(JSON.stringify({ type: "created", roomId, playerId }));
+
+      // si on veut le radiologue dès le début :
+      setTimeout(() => startRadiologist(roomId), 3000);
     }
 
     if (data.type === "join") {
@@ -135,8 +152,11 @@ wss.on("connection", ws => {
       room.clients.push(ws);
 
       ws.send(JSON.stringify({ type: "joined", roomId, playerId }));
+
       broadcast(roomId);
-      startRadiologist(roomId);
+
+      // démarrer le radiologue si pas déjà présent
+      if (!room.radiologist) startRadiologist(roomId);
     }
 
     if (data.type === "move") {
@@ -144,12 +164,14 @@ wss.on("connection", ws => {
       if (!room) return;
 
       const p = room.players[playerId];
+      if (!p) return;
+
       p.x = Math.max(0, Math.min(WIDTH - 1, p.x + data.dx));
       p.y = Math.max(0, Math.min(HEIGHT - 1, p.y + data.dy));
 
-      const i = room.products.findIndex(pr => pr.x === p.x && pr.y === p.y);
-      if (i !== -1) {
-        room.products.splice(i, 1);
+      const idx = room.products.findIndex(pr => pr.x === p.x && pr.y === p.y);
+      if (idx !== -1) {
+        room.products.splice(idx, 1);
         p.collected++;
         room.products.push(generateProducts()[0]);
       }
@@ -163,6 +185,7 @@ wss.on("connection", ws => {
     delete rooms[roomId].players[playerId];
     rooms[roomId].clients = rooms[roomId].clients.filter(c => c !== ws);
     if (rooms[roomId].clients.length === 0) delete rooms[roomId];
+    else broadcast(roomId);
   });
 });
 
