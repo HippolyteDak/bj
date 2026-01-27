@@ -38,52 +38,85 @@ function broadcast(roomId){
   room.sockets.forEach(ws=>{ if(ws.readyState===1) ws.send(JSON.stringify(data)); });
 }
 
+// Boucle radiologue
 function startRadiologistLoop(roomId){
   const room = rooms[roomId];
   if(!room || room.holes.length<2) return;
 
   setTimeout(()=>{
     if(!rooms[roomId]) return;
+
     const entry = room.holes[Math.floor(Math.random()*room.holes.length)];
     const exit  = room.holes[Math.floor(Math.random()*room.holes.length)];
     room.radiologist = {
-      x:entry.x, y:entry.y,
-      dx:Math.sign(exit.x-entry.x)||1,
-      dy:Math.sign(exit.y-entry.y)||0,
-      start:Date.now(),
-      duration:6000+Math.random()*4000
+      x: entry.x,
+      y: entry.y,
+      dx: Math.sign(exit.x-entry.x) || 1,
+      dy: Math.sign(exit.y-entry.y) || 0,
+      start: Date.now(),
+      duration: 6000 + Math.random()*4000,
+      required: 1
     };
-    room.required = Math.max(1, Math.floor(room.radiologist.duration/3000));
+    room.radiologist.required = Math.max(1, Math.floor(room.radiologist.duration/3000));
 
     const interval = setInterval(()=>{
       if(!room.radiologist) return;
 
-      // Déplacement du radiologue
-      if(Math.random()<0.3){ room.radiologist.dx*=-1; room.radiologist.dy*=-1; }
-      room.radiologist.x=Math.max(0, Math.min(WIDTH-1, room.radiologist.x+room.radiologist.dx));
-      room.radiologist.y=Math.max(0, Math.min(HEIGHT-1, room.radiologist.y+room.radiologist.dy));
+      // Déplacement d'une seule case par tick
+      room.radiologist.x += room.radiologist.dx;
+      room.radiologist.y += room.radiologist.dy;
+      room.radiologist.x = Math.max(0, Math.min(WIDTH-1, room.radiologist.x));
+      room.radiologist.y = Math.max(0, Math.min(HEIGHT-1, room.radiologist.y));
+
+      // Petit effet aléatoire demi-tour
+      if(Math.random()<0.1){ room.radiologist.dx*=-1; room.radiologist.dy*=-1; }
 
       broadcast(roomId);
 
-      // Sortie sur un trou après 3s minimum
-      if(room.holes.some(h=>h.x===room.radiologist.x && h.y===room.radiologist.y)
-         && Date.now()-room.radiologist.start>=3000){
-        clearInterval(interval); room.radiologist=null; room.required=0; broadcast(roomId);
-        startRadiologistLoop(roomId);
+      // Radiologue peut sortir uniquement si sur un trou ET après 3s
+      if(room.holes.some(h=>h.x===room.radiologist.x && h.y===room.radiologist.y) &&
+         Date.now()-room.radiologist.start >= 3000){
+        endRadiologist(roomId, interval);
       }
-    }, 700);
 
-    // Fin de présence automatique
-    setTimeout(()=>{
-      clearInterval(interval);
-      room.radiologist=null;
-      room.required=0;
-      broadcast(roomId);
-      startRadiologistLoop(roomId);
-    }, room.radiologist.duration);
+    }, 1200); // <- plus lent, 1.2s par case
+
+    setTimeout(()=>endRadiologist(roomId, interval), room.radiologist.duration);
 
   }, 3000 + Math.random()*4000);
 }
+
+function endRadiologist(roomId, interval){
+  clearInterval(interval);
+  const room = rooms[roomId];
+  if(!room || !room.radiologist) return;
+
+  // Vérifie chaque joueur
+  for(const [playerId, player] of Object.entries(room.players)){
+    if((player.collectedVisit || 0) < room.radiologist.required){
+      player.lives = Math.max(0, (player.lives||3)-1); // vie ≥ 0
+    }
+    player.collectedVisit = 0; // reset compteur
+  }
+
+  room.radiologist = null;
+  room.required = 0;
+  broadcast(roomId);
+
+  // Fin de partie si un joueur est à 0 vie
+  const losers = Object.entries(room.players).filter(([_,p])=>p.lives===0);
+  if(losers.length > 0){
+    const loserId = losers[0][0];
+    const winnerId = Object.keys(room.players).find(id=>id!==loserId) || loserId;
+    broadcast(roomId, { type:"gameover", winnerId, loserId });
+    delete rooms[roomId]; // ferme la partie
+    return;
+  }
+
+  // Sinon on relance un nouveau radiologue
+  startRadiologistLoop(roomId);
+}
+
 
 function resetRoom(roomId){
   const room = rooms[roomId];
