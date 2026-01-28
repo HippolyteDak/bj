@@ -148,6 +148,28 @@ function startRadiologist(roomId) {
       clearInterval(interval);
       room.radiologist = null;
 
+      //check si un joueur a la clope
+      Object.values(room.players).forEach(p => {
+      if(p.clopeBonus){
+        // joueur immunisé, ne perd pas de vie
+        p.collectedVisit = room.required; // reset produits collectés
+        p.clopeBonus = false;
+    
+        // déplacer automatiquement sur une case libre adjacente
+        const freeCells = [
+          {x:p.x+1,y:p.y},{x:p.x-1,y:p.y},
+          {x:p.x,y:p.y+1},{x:p.x,y:p.y-1}
+        ].filter(c => c.x>=0 && c.x<WIDTH && c.y>=0 && c.y<HEIGHT && !room.holes.some(h=>h.x===c.x && h.y===c.y));
+    
+        if(freeCells.length) {
+          const target = freeCells[Math.floor(Math.random() * freeCells.length)];
+          p.x = target.x;
+          p.y = target.y;
+        }
+      }
+    });
+
+      
       // Vérifier quotas pour tous les joueurs
       Object.entries(room.players).forEach(([pid, p]) => {
         if (p.collectedVisit < room.required) p.lives--;
@@ -183,7 +205,7 @@ function startRadiologist(roomId) {
           return;
         }
       }
-
+      
       // 25% de chance de spawn une clope
       if (Math.random() < 0.25) {
         spawnClope(room);
@@ -271,7 +293,7 @@ wss.on("connection", ws => {
       // Vérifie clope sur la case
       // clope
       if (room.clope && p.x === room.clope.x && p.y === room.clope.y) {
-        //p.collected++;        // ou autre bonus si tu veux plus tard
+        p.clopeBonus = true;      // ou autre bonus si tu veux plus tard
         room.clope = null;
       }
       
