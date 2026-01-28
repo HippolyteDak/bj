@@ -6,8 +6,8 @@ const wss = new WebSocketServer({ port: process.env.PORT || 8080 });
 const WIDTH = 10;
 const HEIGHT = 10;
 const BASE_PRODUCTS = 6;
-const RADIO_MIN_TIME = 2000; // 2 secondes minimum par radiologue
-const RADIO_MAX_TIME = 2000; // 5 secondes maximum par radiologue
+const RADIO_MIN_TIME = 4000; // 2 secondes minimum par radiologue
+const RADIO_MAX_TIME = 10000; // 5 secondes maximum par radiologue
 
 const rooms = {};
 
