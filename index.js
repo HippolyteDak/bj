@@ -66,7 +66,8 @@ function broadcast(roomId, msg) {
     products: room.products,
     holes: room.holes,
     radiologist: room.radiologist,
-    required: room.required
+    required: room.required,
+    clope: room.clope
   };
 
   room.clients.forEach(ws => {
@@ -77,6 +78,8 @@ function broadcast(roomId, msg) {
 // Boucle radiologue
 function startRadiologist(roomId) {
   const room = rooms[roomId];
+  room.clope = null;
+  
   if (!room || room.holes.length < 2) return;
 
   // Choisir entrée/sortie
@@ -181,6 +184,12 @@ function startRadiologist(roomId) {
         }
       }
 
+      // 25% de chance de spawn une clope
+      if (Math.random() < 0.25) {
+        spawnClope(room);
+      }
+
+
       broadcast(roomId);
       setTimeout(()=> startRadiologist(roomId), 3000 + Math.random()*2000);
       return;
@@ -189,6 +198,21 @@ function startRadiologist(roomId) {
     broadcast(roomId);
   }, 700);
 }
+
+function spawnClope(room) {
+  let x, y;
+  do {
+    x = Math.floor(Math.random() * WIDTH);
+    y = Math.floor(Math.random() * HEIGHT);
+  } while (
+    room.products.some(p => p.x === x && p.y === y) ||
+    room.holes.some(h => h.x === x && h.y === y) ||
+    Object.values(room.players).some(p => p.x === x && p.y === y)
+  );
+
+  room.clope = { x, y };
+}
+
 
 // =================== Connexions ===================
 wss.on("connection", ws => {
@@ -209,6 +233,7 @@ wss.on("connection", ws => {
         holes: generateHoles(),
         radiologist: null,
         required: 0,
+        clope: null,
         clients: [ws]
       };
 
@@ -243,6 +268,13 @@ wss.on("connection", ws => {
       p.x = Math.max(0, Math.min(WIDTH-1, p.x + data.dx));
       p.y = Math.max(0, Math.min(HEIGHT-1, p.y + data.dy));
 
+      // Vérifie clope sur la case
+      // clope
+      if (room.clope && p.x === room.clope.x && p.y === room.clope.y) {
+        //p.collected++;        // ou autre bonus si tu veux plus tard
+        room.clope = null;
+      }
+      
       // Vérifie si produit sur la case
       const idx = room.products.findIndex(pr => pr.x === p.x && pr.y === p.y);
       if(idx!==-1){
