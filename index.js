@@ -207,7 +207,7 @@ function startRadiologist(roomId) {
       }
       
       // 25% de chance de spawn une clope
-      if (Math.random() < 1) {
+      if (Math.random() < 0.25) {
         spawnClope(room);
       }
 
