@@ -75,8 +75,7 @@ function startRadiologist(roomId) {
     y: entry.y,
     dx: Math.sign(exit.x - entry.x) || 1,
     dy: Math.sign(exit.y - entry.y) || 0,
-    spawnTime,
-    maxDuration
+    spawnTime
   };
 
   // Reset collectedVisit pour tous les joueurs
