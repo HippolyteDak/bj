@@ -6,6 +6,7 @@ const wss = new WebSocketServer({ port: process.env.PORT || 8080 });
 const WIDTH = 10;
 const HEIGHT = 10;
 const BASE_PRODUCTS = 6;
+const RADIO_MIN_TIME = 2000; // 2 secondes minimum
 
 const rooms = {};
 
@@ -67,12 +68,15 @@ function startRadiologist(roomId) {
   const entry = room.holes[Math.floor(Math.random() * room.holes.length)];
   const exit  = room.holes[Math.floor(Math.random() * room.holes.length)];
 
+  const spawnTime = Date.now();
   room.required = Math.max(1, Math.floor(2 + Math.random() * 3));
   room.radiologist = {
     x: entry.x,
     y: entry.y,
     dx: Math.sign(exit.x - entry.x) || 1,
-    dy: Math.sign(exit.y - entry.y) || 0
+    dy: Math.sign(exit.y - entry.y) || 0,
+    spawnTime,
+    maxDuration
   };
 
   // Reset collectedVisit pour tous les joueurs
@@ -91,8 +95,10 @@ function startRadiologist(roomId) {
     r.x = Math.max(0, Math.min(WIDTH - 1, r.x + r.dx));
     r.y = Math.max(0, Math.min(HEIGHT - 1, r.y + r.dy));
 
+    const elapsed = Date.now() - r.spawnTime;
+
     // Si sur un trou et min 3 sec écoulées => radiologue sort
-    if (room.holes.some(h => h.x === r.x && h.y === r.y)) {
+    if (room.holes.some(h => h.x === r.x && h.y === r.y) && elapsed >= RADIO_MIN_TIME) {
       clearInterval(interval);
       room.radiologist = null;
 
