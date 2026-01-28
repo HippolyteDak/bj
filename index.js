@@ -73,8 +73,6 @@ function startRadiologist(roomId) {
   room.radiologist = {
     x: entry.x,
     y: entry.y,
-    dx: Math.sign(exit.x - entry.x) || 1,
-    dy: Math.sign(exit.y - entry.y) || 0,
     spawnTime
   };
 
@@ -85,14 +83,26 @@ function startRadiologist(roomId) {
     if (!room.radiologist) return;
 
     const r = room.radiologist;
-    // Mouvement aléatoire pour petits virages
-    if (Math.random() < 0.2) {
-      r.dx *= -1;
-      r.dy *= -1;
-    }
+    // déplacements possibles
+    const moves = [
+      { dx: 1, dy: 0 },
+      { dx: -1, dy: 0 },
+      { dx: 0, dy: 1 },
+      { dx: 0, dy: -1 }
+    ];
 
-    r.x = Math.max(0, Math.min(WIDTH - 1, r.x + r.dx));
-    r.y = Math.max(0, Math.min(HEIGHT - 1, r.y + r.dy));
+    // on garde uniquement les mouvements valides
+    const validMoves = moves.filter(m => {
+      const nx = r.x + m.dx;
+      const ny = r.y + m.dy;
+      return nx >= 0 && nx < WIDTH && ny >= 0 && ny < HEIGHT;
+    });
+
+    if (validMoves.length > 0) {
+      const m = validMoves[Math.floor(Math.random() * validMoves.length)];
+      r.x += m.dx;
+      r.y += m.dy;
+    }
 
     const elapsed = Date.now() - r.spawnTime;
 
