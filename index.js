@@ -294,7 +294,7 @@ wss.on("connection", ws => {
       // clope
       if (room.clope && p.x === room.clope.x && p.y === room.clope.y) {
         p.clopeBonus = true;      // ou autre bonus si tu veux plus tard
-        room.clope = null;
+        //room.clope = null;
       }
       
       // Vérifie si produit sur la case
