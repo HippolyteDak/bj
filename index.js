@@ -6,7 +6,8 @@ const wss = new WebSocketServer({ port: process.env.PORT || 8080 });
 const WIDTH = 10;
 const HEIGHT = 10;
 const BASE_PRODUCTS = 6;
-const RADIO_MIN_TIME = 2000; // 2 secondes minimum
+const RADIO_MIN_TIME = 2000; // 2 secondes minimum par radiologue
+const RADIO_MAX_TIME = 2000; // 5 secondes maximum par radiologue
 
 const rooms = {};
 
@@ -27,6 +28,20 @@ function generateHoles() {
     if (Math.random() < 0.3) holes.push({ x: WIDTH - 1, y: i });
   }
   return holes;
+}
+
+function nearestHole(x, y, holes) {
+  let best = null;
+  let bestDist = Infinity;
+
+  for (const h of holes) {
+    const d = Math.abs(h.x - x) + Math.abs(h.y - y);
+    if (d < bestDist) {
+      bestDist = d;
+      best = h;
+    }
+  }
+  return best;
 }
 
 // Générer n produits aléatoires
@@ -69,11 +84,15 @@ function startRadiologist(roomId) {
   const exit  = room.holes[Math.floor(Math.random() * room.holes.length)];
 
   const spawnTime = Date.now();
+  const maxDuration = RADIO_MIN_TIME + Math.random() * (RADIO_MAX_TIME - RADIO_MIN_TIME);
   room.required = Math.max(1, Math.floor(2 + Math.random() * 3));
   room.radiologist = {
     x: entry.x,
     y: entry.y,
-    spawnTime
+    spawnTime,
+    maxDuration,
+    exiting: false,
+    targetHole: null
   };
 
   // Reset collectedVisit pour tous les joueurs
@@ -84,27 +103,42 @@ function startRadiologist(roomId) {
 
     const r = room.radiologist;
     // déplacements possibles
-    const moves = [
-      { dx: 1, dy: 0 },
-      { dx: -1, dy: 0 },
-      { dx: 0, dy: 1 },
-      { dx: 0, dy: -1 }
-    ];
+    const elapsed = Date.now() - r.spawnTime;
 
-    // on garde uniquement les mouvements valides
-    const validMoves = moves.filter(m => {
-      const nx = r.x + m.dx;
-      const ny = r.y + m.dy;
-      return nx >= 0 && nx < WIDTH && ny >= 0 && ny < HEIGHT;
-    });
-
-    if (validMoves.length > 0) {
-      const m = validMoves[Math.floor(Math.random() * validMoves.length)];
-      r.x += m.dx;
-      r.y += m.dy;
+    // phase sortie
+    if (elapsed >= r.maxDuration && !r.exiting) {
+      r.exiting = true;
+      r.targetHole = nearestHole(r.x, r.y, room.holes);
     }
 
-    const elapsed = Date.now() - r.spawnTime;
+    // mouvements
+    if (r.exiting && r.targetHole) {
+      // se diriger vers le trou
+      if (r.x < r.targetHole.x) r.x++;
+      else if (r.x > r.targetHole.x) r.x--;
+      else if (r.y < r.targetHole.y) r.y++;
+      else if (r.y > r.targetHole.y) r.y--;
+    } else {
+      // déplacement libre
+      const moves = [
+        { dx: 1, dy: 0 },
+        { dx: -1, dy: 0 },
+        { dx: 0, dy: 1 },
+        { dx: 0, dy: -1 }
+      ];
+
+      const valid = moves.filter(m => {
+        const nx = r.x + m.dx;
+        const ny = r.y + m.dy;
+        return nx >= 0 && nx < WIDTH && ny >= 0 && ny < HEIGHT;
+      });
+
+      if (valid.length) {
+        const m = valid[Math.floor(Math.random() * valid.length)];
+        r.x += m.dx;
+        r.y += m.dy;
+      }
+    }
 
     // Si sur un trou et min 3 sec écoulées => radiologue sort
     if (room.holes.some(h => h.x === r.x && h.y === r.y) && elapsed >= RADIO_MIN_TIME) {
