@@ -80,6 +80,7 @@ function broadcast(roomId, msg) {
 // Boucle radiologue
 function startRadiologist(roomId) {
   const room = rooms[roomId];
+  if(!room) return;
   room.clope = null;
   
   if (!room || room.holes.length < 2) return;
