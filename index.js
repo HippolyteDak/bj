@@ -333,6 +333,7 @@ function moveStretcher(roomId) {
 
       if (hit && !p.immune) {
         p.lives--;
+        endGame(roomId);
       }
     });
 
