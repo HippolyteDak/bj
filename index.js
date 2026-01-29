@@ -67,7 +67,9 @@ function broadcast(roomId, msg) {
     holes: room.holes,
     radiologist: room.radiologist,
     required: room.required,
-    clope: room.clope
+    clope: room.clope,
+    stretcher: room.stretcher,
+    stretcherWarning: room.stretcherWarning
   };
 
   room.clients.forEach(ws => {
