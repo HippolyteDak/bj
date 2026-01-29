@@ -179,7 +179,28 @@ function startRadiologist(roomId) {
       });
 
       // Vérifier fin de partie
-      const pIds = Object.keys(room.players);
+      endGame(room);
+      
+      // 25% de chance de spawn une clope
+      if (Math.random() < 0.25) {
+        spawnClope(room);
+      }
+      if (Math.random() < 1) {
+        spawnStretcherWarning(roomId);
+      }
+
+
+
+      broadcast(roomId);
+      setTimeout(()=> startRadiologist(roomId), 3000 + Math.random()*2000);
+      return;
+    }
+
+    broadcast(roomId);
+  }, 700);
+}
+function endGame(room){
+    const pIds = Object.keys(room.players);
       const p0 = room.players[pIds[0]];
       const p1 = room.players[pIds[1]];
 
@@ -207,24 +228,6 @@ function startRadiologist(roomId) {
           return;
         }
       }
-      
-      // 25% de chance de spawn une clope
-      if (Math.random() < 0.25) {
-        spawnClope(room);
-      }
-      if (Math.random() < 1) {
-        spawnStretcherWarning(roomId);
-      }
-
-
-
-      broadcast(roomId);
-      setTimeout(()=> startRadiologist(roomId), 3000 + Math.random()*2000);
-      return;
-    }
-
-    broadcast(roomId);
-  }, 700);
 }
 
 function spawnClope(room) {
