@@ -222,6 +222,14 @@ function startRadiologist(roomId) {
 }
 
 function spawnClope(room) {
+  room.clope = findFreeCell(room);
+}
+
+function spawnProduct(room) {
+  room.products.push(findFreeCell(room));
+}
+
+function findFreeCell(room) {
   let x, y;
   do {
     x = Math.floor(Math.random() * WIDTH);
@@ -229,11 +237,12 @@ function spawnClope(room) {
   } while (
     room.products.some(p => p.x === x && p.y === y) ||
     room.holes.some(h => h.x === x && h.y === y) ||
-    Object.values(room.players).some(p => p.x === x && p.y === y)
+    Object.values(room.players).some(p => p.x === x && p.y === y) ||
+    (room.clope && room.clope.x === x && room.clope.y === y)
   );
-
-  room.clope = { x, y };
+  return { x, y };
 }
+
 
 
 // =================== Connexions ===================
@@ -306,11 +315,7 @@ wss.on("connection", ws => {
         p.collectedVisit++;
 
         // Respawn 1 produit
-        let newProd;
-        do {
-          newProd = { x: Math.floor(Math.random()*WIDTH), y: Math.floor(Math.random()*HEIGHT) };
-        } while(room.products.some(pr=>pr.x===newProd.x && pr.y===newProd.y));
-        room.products.push(newProd);
+        spawnProduct(room);
       }
 
       broadcast(roomId);
