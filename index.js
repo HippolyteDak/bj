@@ -210,6 +210,10 @@ function startRadiologist(roomId) {
       if (Math.random() < 0.25) {
         spawnClope(room);
       }
+      if (Math.random() < 1) {
+        spawnStretcherWarning(roomId);
+      }
+
 
 
       broadcast(roomId);
@@ -242,6 +246,101 @@ function findFreeCell(room) {
   );
   return { x, y };
 }
+
+function pickStretcherDoor(room) {
+  const door = room.holes[Math.floor(Math.random() * room.holes.length)];
+
+  if (door.x === 0)       return { ...door, dir: "right" };
+  if (door.x === WIDTH-1) return { ...door, dir: "left" };
+  if (door.y === 0)       return { ...door, dir: "down" };
+  if (door.y === HEIGHT-1)return { ...door, dir: "up" };
+}
+
+function spawnStretcherWarning(roomId) {
+  const room = rooms[roomId];
+  if (!room) return;
+
+  const door = pickStretcherDoor(room);
+
+  room.stretcherWarning = {
+    x: door.x,
+    y: door.y,
+    dir: door.dir
+  };
+
+  broadcast(roomId);
+
+  // après 1,5s → brancard arrive
+  setTimeout(() => {
+    if (rooms[roomId]) spawnStretcher(roomId, door);
+  }, 1500);
+}
+
+function spawnStretcher(roomId, door) {
+  const room = rooms[roomId];
+  if (!room) return;
+
+  room.stretcherWarning = null;
+
+  let stretcher;
+
+  if (door.dir === "right") {
+    stretcher = { x: 0, y: door.y, dx: 1, dy: 0, orientation: "horizontal" };
+  }
+  if (door.dir === "left") {
+    stretcher = { x: WIDTH-2, y: door.y, dx: -1, dy: 0, orientation: "horizontal" };
+  }
+  if (door.dir === "down") {
+    stretcher = { x: door.x, y: 0, dx: 0, dy: 1, orientation: "vertical" };
+  }
+  if (door.dir === "up") {
+    stretcher = { x: door.x, y: HEIGHT-2, dx: 0, dy: -1, orientation: "vertical" };
+  }
+
+  room.stretcher = stretcher;
+  broadcast(roomId);
+
+  moveStretcher(roomId);
+}
+
+function moveStretcher(roomId) {
+  const room = rooms[roomId];
+  if (!room || !room.stretcher) return;
+
+  const interval = setInterval(() => {
+    const s = room.stretcher;
+    if (!s) return clearInterval(interval);
+
+    s.x += s.dx;
+    s.y += s.dy;
+
+    // 🧍 collision joueurs
+    Object.values(room.players).forEach(p => {
+      const hit =
+        (p.x === s.x && p.y === s.y) ||
+        (s.orientation === "horizontal" && p.x === s.x + 1 && p.y === s.y) ||
+        (s.orientation === "vertical" && p.x === s.x && p.y === s.y + 1);
+
+      if (hit && !p.immune) {
+        p.lives--;
+      }
+    });
+
+    // sortie de map
+    if (
+      s.x < -2 || s.y < -2 ||
+      s.x > WIDTH+1 || s.y > HEIGHT+1
+    ) {
+      clearInterval(interval);
+      room.stretcher = null;
+    }
+
+    broadcast(roomId);
+  }, 300);
+}
+
+
+
 
 
 
