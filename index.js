@@ -179,7 +179,7 @@ function startRadiologist(roomId) {
       });
 
       // Vérifier fin de partie
-      endGame(room);
+      endGame(roomId);
       
       // 25% de chance de spawn une clope
       if (Math.random() < 0.25) {
@@ -199,7 +199,11 @@ function startRadiologist(roomId) {
     broadcast(roomId);
   }, 700);
 }
-function endGame(room){
+
+function endGame(roomId){
+  const room = rooms[roomId];
+  if (!room) return;
+  
     const pIds = Object.keys(room.players);
       const p0 = room.players[pIds[0]];
       const p1 = room.players[pIds[1]];
