@@ -180,19 +180,19 @@ function startRadiologist(roomId) {
 
       // Vérifier fin de partie
       endGame(roomId);
-      
-      // 25% de chance de spawn une clope
-      if (Math.random() < 0.25) {
-        spawnClope(room);
+
+      if (room){
+        // 25% de chance de spawn une clope
+        if (Math.random() < 0.25) {
+          spawnClope(room);
+        }
+        if (Math.random() < 1) {
+          spawnStretcherWarning(roomId);
+        }
+  
+        broadcast(roomId);
+        setTimeout(()=> startRadiologist(roomId), 3000 + Math.random()*2000);
       }
-      if (Math.random() < 1) {
-        spawnStretcherWarning(roomId);
-      }
-
-
-
-      broadcast(roomId);
-      setTimeout(()=> startRadiologist(roomId), 3000 + Math.random()*2000);
       return;
     }
 
