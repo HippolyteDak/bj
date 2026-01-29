@@ -286,7 +286,7 @@ wss.on("connection", ws => {
       ws.send(JSON.stringify({type:"joined", roomId, playerId}));
 
       broadcast(roomId);
-      startRadiologist(roomId);
+      setTimeout(() => {startRadiologist(roomId);}, 4000);
     }
 
     if(data.type==="move"){
