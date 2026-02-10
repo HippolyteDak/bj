@@ -69,7 +69,8 @@ function broadcast(roomId, msg) {
     required: room.required,
     clope: room.clope,
     stretcher: room.stretcher,
-    stretcherWarning: room.stretcherWarning
+    stretcherWarning: room.stretcherWarning,
+    veste: room.veste
   };
 
   room.clients.forEach(ws => {
@@ -187,6 +188,9 @@ function startRadiologist(roomId) {
         if (Math.random() < 0.25) {
           spawnClope(room);
         }
+        if (Math.random() < 0.25) {
+          spawnVeste(room);
+        }
         if (Math.random() < 1) {
           spawnStretcherWarning(roomId);
         }
@@ -243,6 +247,10 @@ function spawnProduct(room) {
   room.products.push(findFreeCell(room));
 }
 
+function spawnVeste(room) {
+  room.veste = findFreeCell(room);
+}
+
 function findFreeCell(room) {
   let x, y;
   do {
@@ -252,7 +260,8 @@ function findFreeCell(room) {
     room.products.some(p => p.x === x && p.y === y) ||
     room.holes.some(h => h.x === x && h.y === y) ||
     Object.values(room.players).some(p => p.x === x && p.y === y) ||
-    (room.clope && room.clope.x === x && room.clope.y === y)
+    (room.clope && room.clope.x === x && room.clope.y === y) ||
+    (room.veste && room.veste.x === x && room.veste.y === y)
   );
   return { x, y };
 }
@@ -370,12 +379,13 @@ wss.on("connection", ws => {
       playerId = crypto.randomUUID();
 
       rooms[roomId] = {
-        players: { [playerId]: { id: playerId, x:5, y:5, lives:3, collected:0, collectedVisit:0 } },
+        players: { [playerId]: { id: playerId, x:5, y:5, lives:3, collected:0, collectedVisit:0, paralyzedUntil: 0 } },
         products: generateProducts(),
         holes: generateHoles(),
         radiologist: null,
         required: 0,
         clope: null,
+        veste: null,
         clients: [ws]
       };
 
@@ -391,7 +401,7 @@ wss.on("connection", ws => {
 
       roomId = data.roomId;
       playerId = crypto.randomUUID();
-      room.players[playerId] = { id:playerId, x:4, y:5, lives:3, collected:0, collectedVisit:0 };
+      room.players[playerId] = { id:playerId, x:4, y:5, lives:3, collected:0, collectedVisit:0, paralyzedUntil: 0 };
       room.clients.push(ws);
 
       ws.send(JSON.stringify({type:"joined", roomId, playerId}));
@@ -401,6 +411,11 @@ wss.on("connection", ws => {
     }
 
     if(data.type==="move"){
+      
+      const now = Date.now();
+      if (p.paralyzedUntil && now < p.paralyzedUntil) return;
+      if (p.paralyzedUntil && now >= p.paralyzedUntil) p.paralyzedUntil = 0;
+
       const room = rooms[roomId];
       if(!room) return;
 
@@ -416,6 +431,13 @@ wss.on("connection", ws => {
         p.clopeBonus = true;      // ou autre bonus si tu veux plus tard
         broadcast(roomId);
         room.clope = null;
+      }
+
+      if (room.veste && p.x === room.veste.x && p.y === room.veste.y) {
+        p.vesteBonus = true;
+        p.paralyzedUntil = Date.now() + 5000;
+        broadcast(roomId);
+        room.veste = null;
       }
       
       // Vérifie si produit sur la case
