@@ -295,16 +295,16 @@ function spawnStretcher(roomId, door) {
   let stretcher;
 
   if (door.dir === "right") {
-    stretcher = { x: 0, y: door.y, dx: 1, dy: 0, orientation: "horizontal" };
+    stretcher = { x: -2, y: door.y, dx: 1, dy: 0, orientation: "horizontal" };
   }
   if (door.dir === "left") {
-    stretcher = { x: WIDTH-2, y: door.y, dx: -1, dy: 0, orientation: "horizontal" };
+    stretcher = { x: WIDTH, y: door.y, dx: -1, dy: 0, orientation: "horizontal" };
   }
   if (door.dir === "down") {
-    stretcher = { x: door.x, y: 0, dx: 0, dy: 1, orientation: "vertical" };
+    stretcher = { x: door.x, y: -2, dx: 0, dy: 1, orientation: "vertical" };
   }
   if (door.dir === "up") {
-    stretcher = { x: door.x, y: HEIGHT-2, dx: 0, dy: -1, orientation: "vertical" };
+    stretcher = { x: door.x, y: HEIGHT, dx: 0, dy: -1, orientation: "vertical" };
   }
 
   room.stretcher = stretcher;
@@ -321,33 +321,30 @@ function moveStretcher(roomId) {
     const s = room.stretcher;
     if (!s) return clearInterval(interval);
 
-    
-    if (// sortie de map
-      s.x < 0 || s.y < 0 ||
+    s.x += s.dx;
+    s.y += s.dy;
+
+    // 🧍 collision joueurs
+    Object.values(room.players).forEach(p => {
+      const hit =
+        (p.x === s.x && p.y === s.y) ||
+        (s.orientation === "horizontal" && p.x === s.x + 1 && p.y === s.y) ||
+        (s.orientation === "vertical" && p.x === s.x && p.y === s.y + 1);
+
+      if (hit && !p.immune) {
+        p.lives--;
+        endGame(roomId);
+      }
+    });
+
+    // sortie de map
+    if (
+      s.x < -2 || s.y < -2 ||
       s.x > WIDTH+1 || s.y > HEIGHT+1
     ) {
       clearInterval(interval);
       room.stretcher = null;
     }
-    else// dans la map
-    {
-      s.x += s.dx;
-      s.y += s.dy;
-  
-      // 🧍 collision joueurs
-      Object.values(room.players).forEach(p => {
-        const hit =
-          (p.x === s.x && p.y === s.y) ||
-          (s.orientation === "horizontal" && p.x === s.x + 1 && p.y === s.y) ||
-          (s.orientation === "vertical" && p.x === s.x && p.y === s.y + 1);
-  
-        if (hit && !p.immune) {
-          p.lives--;
-          endGame(roomId);
-        }
-      });
-    }
-    
 
     broadcast(roomId);
   }, 300);
