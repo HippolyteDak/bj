@@ -412,15 +412,15 @@ wss.on("connection", ws => {
 
     if(data.type==="move"){
       
-      const now = Date.now();
-      if (p.paralyzedUntil && now < p.paralyzedUntil) return;
-      if (p.paralyzedUntil && now >= p.paralyzedUntil) p.paralyzedUntil = 0;
-
       const room = rooms[roomId];
       if(!room) return;
 
       const p = room.players[playerId];
       if(!p) return;
+
+      const now = Date.now();
+      if (p.paralyzedUntil && now < p.paralyzedUntil) return;
+      if (p.paralyzedUntil && now >= p.paralyzedUntil) p.paralyzedUntil = 0;
 
       p.x = Math.max(0, Math.min(WIDTH-1, p.x + data.dx));
       p.y = Math.max(0, Math.min(HEIGHT-1, p.y + data.dy));
