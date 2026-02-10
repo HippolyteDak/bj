@@ -339,8 +339,8 @@ function moveStretcher(roomId) {
 
     // sortie de map
     if (
-      s.x < -2 || s.y < -2 ||
-      s.x > WIDTH+1 || s.y > HEIGHT+1
+      s.x < -1 || s.y < -1 ||
+      s.x > WIDTH+0 || s.y > HEIGHT+0
     ) {
       clearInterval(interval);
       room.stretcher = null;
