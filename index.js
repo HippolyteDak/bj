@@ -295,13 +295,13 @@ function spawnStretcher(roomId, door) {
   let stretcher;
 
   if (door.dir === "right") {
-    stretcher = { x: -2, y: door.y, dx: 1, dy: 0, orientation: "horizontal" };
+    stretcher = { x: -1, y: door.y, dx: 1, dy: 0, orientation: "horizontal" };
   }
   if (door.dir === "left") {
     stretcher = { x: WIDTH, y: door.y, dx: -1, dy: 0, orientation: "horizontal" };
   }
   if (door.dir === "down") {
-    stretcher = { x: door.x, y: -2, dx: 0, dy: 1, orientation: "vertical" };
+    stretcher = { x: door.x, y: -1, dx: 0, dy: 1, orientation: "vertical" };
   }
   if (door.dir === "up") {
     stretcher = { x: door.x, y: HEIGHT, dx: 0, dy: -1, orientation: "vertical" };
@@ -339,8 +339,8 @@ function moveStretcher(roomId) {
 
     // sortie de map
     if (
-      s.x < -2 || s.y < -2 ||
-      s.x > WIDTH+1 || s.y > HEIGHT+1
+      s.x < 0 || s.y < 0 ||
+      s.x > WIDTH || s.y > HEIGHT
     ) {
       clearInterval(interval);
       room.stretcher = null;
