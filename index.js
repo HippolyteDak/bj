@@ -295,13 +295,13 @@ function spawnStretcher(roomId, door) {
   let stretcher;
 
   if (door.dir === "right") {
-    stretcher = { x: -1, y: door.y, dx: 1, dy: 0, orientation: "horizontal" };
+    stretcher = { x: 0, y: door.y, dx: 1, dy: 0, orientation: "horizontal" };
   }
   if (door.dir === "left") {
     stretcher = { x: WIDTH, y: door.y, dx: -1, dy: 0, orientation: "horizontal" };
   }
   if (door.dir === "down") {
-    stretcher = { x: door.x, y: -1, dx: 0, dy: 1, orientation: "vertical" };
+    stretcher = { x: door.x, y: 0, dx: 0, dy: 1, orientation: "vertical" };
   }
   if (door.dir === "up") {
     stretcher = { x: door.x, y: HEIGHT, dx: 0, dy: -1, orientation: "vertical" };
