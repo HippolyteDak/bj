@@ -321,30 +321,33 @@ function moveStretcher(roomId) {
     const s = room.stretcher;
     if (!s) return clearInterval(interval);
 
-    s.x += s.dx;
-    s.y += s.dy;
-
-    // 🧍 collision joueurs
-    Object.values(room.players).forEach(p => {
-      const hit =
-        (p.x === s.x && p.y === s.y) ||
-        (s.orientation === "horizontal" && p.x === s.x + 1 && p.y === s.y) ||
-        (s.orientation === "vertical" && p.x === s.x && p.y === s.y + 1);
-
-      if (hit && !p.immune) {
-        p.lives--;
-        endGame(roomId);
-      }
-    });
-
-    // sortie de map
-    if (
-      s.x < 1 || s.y < 1 ||
-      s.x > WIDTH-2 || s.y > HEIGHT-2
+    
+    if (// sortie de map
+      s.x < 0 || s.y < 0 ||
+      s.x > WIDTH-1 || s.y > HEIGHT-1
     ) {
       clearInterval(interval);
       room.stretcher = null;
     }
+    else// dans la map
+    {
+      s.x += s.dx;
+      s.y += s.dy;
+  
+      // 🧍 collision joueurs
+      Object.values(room.players).forEach(p => {
+        const hit =
+          (p.x === s.x && p.y === s.y) ||
+          (s.orientation === "horizontal" && p.x === s.x + 1 && p.y === s.y) ||
+          (s.orientation === "vertical" && p.x === s.x && p.y === s.y + 1);
+  
+        if (hit && !p.immune) {
+          p.lives--;
+          endGame(roomId);
+        }
+      });
+    }
+    
 
     broadcast(roomId);
   }, 300);
